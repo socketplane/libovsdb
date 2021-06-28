@@ -96,7 +96,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	reply, err := c.Transact(ovsOps...)
+	reply, err := c.Transact(context.Background(), ovsOps...)
 	if err != nil {
 		log.Fatal(err)
 	}

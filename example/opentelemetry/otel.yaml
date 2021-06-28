@@ -1,0 +1,43 @@
+receivers:
+  otlp:
+    protocols:
+      grpc:
+  prometheus:
+    config:
+      scrape_configs:
+        - job_name: "stress"
+          scrape_interval: 1s
+          scrape_timeout: 1s
+          static_configs:
+            - targets: ["stress:2222"]
+
+exporters:
+  prometheus:
+    endpoint: "0.0.0.0:8889"
+    namespace: stress
+
+  zipkin:
+    endpoint: "http://zipkin:9411/api/v2/spans"
+    format: proto
+
+  jaeger:
+    endpoint: jaeger:14250
+    insecure: true
+
+processors:
+  batch:
+
+extensions:
+  health_check:
+
+service:
+  extensions: [health_check]
+  pipelines:
+    traces:
+      receivers: [otlp]
+      processors: [batch]
+      exporters: [zipkin, jaeger]
+    metrics:
+      receivers: [prometheus]
+      processors: [batch]
+      exporters: [prometheus]

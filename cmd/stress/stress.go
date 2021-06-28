@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"log"
+	"net/http"
 	"os"
 	"runtime"
 	"runtime/pprof"
@@ -17,6 +18,20 @@ import (
 	"github.com/ovn-org/libovsdb/client"
 	"github.com/ovn-org/libovsdb/model"
 	"github.com/ovn-org/libovsdb/ovsdb"
+	export "go.opentelemetry.io/otel/sdk/export/metric"
+	"go.opentelemetry.io/otel/sdk/metric/aggregator/histogram"
+	controller "go.opentelemetry.io/otel/sdk/metric/controller/basic"
+	processor "go.opentelemetry.io/otel/sdk/metric/processor/basic"
+	selector "go.opentelemetry.io/otel/sdk/metric/selector/simple"
+	"google.golang.org/grpc"
+
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/metric/global"
+	"go.opentelemetry.io/otel/propagation"
+	sdktrace "go.opentelemetry.io/otel/sdk/trace"
+
+	"go.opentelemetry.io/otel/exporters/otlp/otlptrace/otlptracegrpc"
+	"go.opentelemetry.io/otel/exporters/prometheus"
 )
 
 // ORMBridge is the simplified ORM model of the Bridge table
@@ -38,6 +53,7 @@ type ovsType struct {
 var (
 	cpuprofile = flag.String("cpuprofile", "", "write cpu profile to this file")
 	memprofile = flag.String("memoryprofile", "", "write memory profile to this file")
+	otlp       = flag.String("otlp", "", "otlp grpc endpoint address for trace and metrics. e.g localhost:4317")
 	nins       = flag.Int("inserts", 100, "the number of insertions to make to the database (per client)")
 	nclients   = flag.Int("clients", 1, "the number of clients to use")
 	parallel   = flag.Bool("parallel", false, "run clients in parallel")
@@ -58,13 +74,13 @@ func cleanup(ctx context.Context) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	err = ovs.Connect(context.Background())
+	err = ovs.Connect(ctx)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer ovs.Disconnect()
 
-	if _, err := ovs.MonitorAll(); err != nil {
+	if _, err := ovs.MonitorAll(ctx); err != nil {
 		log.Fatal(err)
 	}
 
@@ -100,11 +116,16 @@ func run(ctx context.Context, resultsChan chan result, wg *sync.WaitGroup) {
 	if err != nil {
 		log.Fatal(err)
 	}
-	err = ovs.Connect(context.Background())
+
+	err = ovs.Connect(ctx)
 	if err != nil {
 		log.Fatal(err)
 	}
 	defer ovs.Disconnect()
+
+	if err := ovs.Cache().RegisterMetrics(); err != nil {
+		log.Fatal(err)
+	}
 
 	var bridges []bridgeType
 	bridgeCh := make(map[string]chan bool)
@@ -136,7 +157,7 @@ func run(ctx context.Context, resultsChan chan result, wg *sync.WaitGroup) {
 		},
 	)
 
-	if _, err := ovs.MonitorAll(); err != nil {
+	if _, err := ovs.MonitorAll(ctx); err != nil {
 		log.Fatal(err)
 	}
 
@@ -166,7 +187,7 @@ func run(ctx context.Context, resultsChan chan result, wg *sync.WaitGroup) {
 }
 
 func transact(ctx context.Context, ovs client.Client, operations []ovsdb.Operation) (bool, string) {
-	reply, err := ovs.Transact(operations...)
+	reply, err := ovs.Transact(ctx, operations...)
 	if err != nil {
 		return false, ""
 	}
@@ -234,6 +255,53 @@ func main() {
 	flag.Parse()
 	ctx := context.Background()
 
+	if *otlp != "" {
+		traceExporter, err := otlptracegrpc.New(ctx,
+			otlptracegrpc.WithInsecure(),
+			otlptracegrpc.WithEndpoint(*otlp),
+			otlptracegrpc.WithDialOption(grpc.WithBlock()),
+		)
+		if err != nil {
+			log.Fatalf("failed to initialize export pipeline: %v", err)
+		}
+		bsp := sdktrace.NewBatchSpanProcessor(traceExporter)
+		tracerProvider := sdktrace.NewTracerProvider(
+			sdktrace.WithSampler(sdktrace.AlwaysSample()),
+			sdktrace.WithSpanProcessor(bsp),
+		)
+		otel.SetTracerProvider(tracerProvider)
+
+		// set global propagator to tracecontext (the default is no-op).
+		otel.SetTextMapPropagator(propagation.TraceContext{})
+
+		// Handle this error in a sensible manner where possible
+		defer func() { _ = tracerProvider.Shutdown(ctx) }()
+
+		config := prometheus.Config{}
+		c := controller.New(
+			processor.New(
+				selector.NewWithHistogramDistribution(
+					histogram.WithExplicitBoundaries(config.DefaultHistogramBoundaries),
+				),
+				export.CumulativeExportKindSelector(),
+				processor.WithMemory(true),
+			),
+		)
+
+		exporter, err := prometheus.New(config, c)
+		if err != nil {
+			log.Fatal(err)
+		}
+
+		global.SetMeterProvider(exporter.MeterProvider())
+
+		http.HandleFunc("/", exporter.ServeHTTP)
+		go func() {
+			_ = http.ListenAndServe(":2222", nil)
+		}()
+		fmt.Println("Prometheus server running on :2222")
+	}
+
 	if *cpuprofile != "" {
 		f, err := os.Create(*cpuprofile)
 		if err != nil {
@@ -254,7 +322,18 @@ func main() {
 		log.Fatal(err)
 	}
 
-	cleanup(ctx)
+	args := flag.Args()
+	if len(args) == 0 {
+		log.Fatal("must enter cleanup or test")
+	}
+
+	if args[0] == "cleanup" {
+		cleanup(ctx)
+		os.Exit(0)
+	}
+	if args[0] != "test" {
+		log.Fatalf("unknown command: %s", args[0])
+	}
 
 	var wg sync.WaitGroup
 	resultChan := make(chan result)

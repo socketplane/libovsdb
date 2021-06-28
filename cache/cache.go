@@ -2,6 +2,7 @@ package cache
 
 import (
 	"bytes"
+	"context"
 	"crypto/sha256"
 	"encoding/gob"
 	"encoding/hex"
@@ -15,7 +16,12 @@ import (
 	"github.com/ovn-org/libovsdb/mapper"
 	"github.com/ovn-org/libovsdb/model"
 	"github.com/ovn-org/libovsdb/ovsdb"
+	"go.opentelemetry.io/otel"
+	"go.opentelemetry.io/otel/metric"
+	"go.opentelemetry.io/otel/metric/global"
 )
+
+var tracer = otel.Tracer("libovsdb.ovn.org/cache")
 
 const (
 	updateEvent     = "update"
@@ -346,14 +352,16 @@ func NewTableCache(schema *ovsdb.DatabaseSchema, dbModel *model.DBModel, data Da
 			}
 		}
 	}
-	return &TableCache{
+
+	tc := &TableCache{
 		cache:          cache,
 		schema:         schema,
 		eventProcessor: eventProcessor,
 		mapper:         mapper.NewMapper(schema),
 		dbModel:        dbModel,
 		mutex:          sync.RWMutex{},
-	}, nil
+	}
+	return tc, nil
 }
 
 // Mapper returns the mapper
@@ -389,11 +397,11 @@ func (t *TableCache) Tables() []string {
 
 // Update implements the update method of the NotificationHandler interface
 // this populates the cache with new updates
-func (t *TableCache) Update(context interface{}, tableUpdates ovsdb.TableUpdates) {
+func (t *TableCache) Update(monitorID interface{}, tableUpdates ovsdb.TableUpdates) {
 	if len(tableUpdates) == 0 {
 		return
 	}
-	t.Populate(tableUpdates)
+	t.Populate(context.TODO(), tableUpdates)
 }
 
 // Locked implements the locked method of the NotificationHandler interface
@@ -412,8 +420,36 @@ func (t *TableCache) Echo([]interface{}) {
 func (t *TableCache) Disconnected() {
 }
 
+// RegisterMetrics registers a metric for all known tables
+func (t *TableCache) RegisterMetrics() error {
+	for _, tt := range t.Tables() {
+		if err := t.registerMetric(tt); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (t *TableCache) registerMetric(table string) error {
+	meter := global.Meter("libovsdb.ovn.org/cache")
+	if _, ok := t.cache[table]; !ok {
+		return fmt.Errorf("table not found")
+	}
+	_, err := meter.NewInt64ValueObserver(
+		fmt.Sprintf("libovsdb.cache.%s.size", strings.ToLower(table)),
+		func(ctx context.Context, result metric.Int64ObserverResult) {
+			value := t.Table(table).Len()
+			result.Observe(int64(value))
+		},
+		metric.WithDescription(fmt.Sprintf("the size of the %s table in the cache", strings.ToLower(table))),
+	)
+	return err
+}
+
 // Populate adds data to the cache and places an event on the channel
-func (t *TableCache) Populate(tableUpdates ovsdb.TableUpdates) {
+func (t *TableCache) Populate(ctx context.Context, tableUpdates ovsdb.TableUpdates) {
+	_, span := tracer.Start(ctx, "cache_populate")
+	defer span.End()
 	t.mutex.Lock()
 	defer t.mutex.Unlock()
 

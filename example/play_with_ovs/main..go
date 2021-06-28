@@ -26,8 +26,8 @@ var update chan model.Model
 var rootUUID string
 var connection = flag.String("ovsdb", "unix:/var/run/openvswitch/db.sock", "OVSDB connection string")
 
-func play(ovs client.Client) {
-	go processInput(ovs)
+func play(ctx context.Context, ovs client.Client) {
+	go processInput(ctx, ovs)
 	for model := range update {
 		bridge := model.(*vswitchd.Bridge)
 		if bridge.Name == "stop" {
@@ -47,7 +47,7 @@ func play(ovs client.Client) {
 	}
 }
 
-func createBridge(ovs client.Client, bridgeName string) {
+func createBridge(ctx context.Context, ovs client.Client, bridgeName string) {
 	bridge := vswitchd.Bridge{
 		UUID: "gopher",
 		Name: bridgeName,
@@ -70,7 +70,7 @@ func createBridge(ovs client.Client, bridgeName string) {
 	}
 
 	operations := append(insertOp, mutateOps...)
-	reply, err := ovs.Transact(operations...)
+	reply, err := ovs.Transact(ctx, operations...)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -80,7 +80,7 @@ func createBridge(ovs client.Client, bridgeName string) {
 	fmt.Println("Bridge Addition Successful : ", reply[0].UUID.GoUUID)
 }
 
-func processInput(ovs client.Client) {
+func processInput(ctx context.Context, ovs client.Client) {
 	for {
 		fmt.Printf("\n Enter a Bridge Name : ")
 		var bridgeName string
@@ -88,11 +88,12 @@ func processInput(ovs client.Client) {
 		if bridgeName == "" {
 			continue
 		}
-		createBridge(ovs, bridgeName)
+		createBridge(ctx, ovs, bridgeName)
 	}
 }
 
 func main() {
+	ctx := context.Background()
 	flag.Parse()
 	quit = make(chan bool)
 	update = make(chan model.Model)
@@ -107,7 +108,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	err = ovs.Connect(context.Background())
+	err = ovs.Connect(ctx)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -120,7 +121,7 @@ func main() {
 			}
 		},
 	})
-	_, err = ovs.Monitor(
+	_, err = ovs.Monitor(ctx,
 		ovs.NewTableMonitor(&vswitchd.OpenvSwitch{}),
 		ovs.NewTableMonitor(&vswitchd.Bridge{}),
 	)
@@ -131,6 +132,6 @@ func main() {
 	rootUUID = ovs.Cache().Table(ovsTable).Rows()[0]
 
 	fmt.Println(`Silly game of stopping this app when a Bridge with name "stop" is monitored !`)
-	go play(ovs)
+	go play(ctx, ovs)
 	<-quit
 }
