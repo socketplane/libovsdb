@@ -58,7 +58,7 @@ type (
 	AtomicTableProtocol  = string
 )
 
-const (
+var (
 	AtomicTableEventTypeEmptyLbBackends AtomicTableEventType = "empty_lb_backends"
 	AtomicTableProtocolTCP              AtomicTableProtocol  = "tcp"
 	AtomicTableProtocolUDP              AtomicTableProtocol  = "udp"
@@ -67,12 +67,12 @@ const (
 
 // AtomicTable defines an object in atomicTable table
 type AtomicTable struct {
-	UUID      string                ` + "`" + `ovsdb:"_uuid"` + "`" + `
-	EventType AtomicTableEventType  ` + "`" + `ovsdb:"event_type"` + "`" + `
-	Float     float64               ` + "`" + `ovsdb:"float"` + "`" + `
-	Int       int                   ` + "`" + `ovsdb:"int"` + "`" + `
-	Protocol  []AtomicTableProtocol ` + "`" + `ovsdb:"protocol"` + "`" + `
-	Str       string                ` + "`" + `ovsdb:"str"` + "`" + `
+	UUID      string               ` + "`" + `ovsdb:"_uuid"` + "`" + `
+	EventType AtomicTableEventType ` + "`" + `ovsdb:"event_type"` + "`" + `
+	Float     float64              ` + "`" + `ovsdb:"float"` + "`" + `
+	Int       int                  ` + "`" + `ovsdb:"int"` + "`" + `
+	Protocol  *AtomicTableProtocol ` + "`" + `ovsdb:"protocol"` + "`" + `
+	Str       string               ` + "`" + `ovsdb:"str"` + "`" + `
 }
 `,
 		},
@@ -88,12 +88,12 @@ package test
 
 // AtomicTable defines an object in atomicTable table
 type AtomicTable struct {
-	UUID      string   ` + "`" + `ovsdb:"_uuid"` + "`" + `
-	EventType string   ` + "`" + `ovsdb:"event_type"` + "`" + `
-	Float     float64  ` + "`" + `ovsdb:"float"` + "`" + `
-	Int       int      ` + "`" + `ovsdb:"int"` + "`" + `
-	Protocol  []string ` + "`" + `ovsdb:"protocol"` + "`" + `
-	Str       string   ` + "`" + `ovsdb:"str"` + "`" + `
+	UUID      string  ` + "`" + `ovsdb:"_uuid"` + "`" + `
+	EventType string  ` + "`" + `ovsdb:"event_type"` + "`" + `
+	Float     float64 ` + "`" + `ovsdb:"float"` + "`" + `
+	Int       int     ` + "`" + `ovsdb:"int"` + "`" + `
+	Protocol  *string ` + "`" + `ovsdb:"protocol"` + "`" + `
+	Str       string  ` + "`" + `ovsdb:"str"` + "`" + `
 }
 `,
 		},
@@ -118,7 +118,7 @@ type (
 	AtomicTableProtocol  = string
 )
 
-const (
+var (
 	AtomicTableEventTypeEmptyLbBackends AtomicTableEventType = "empty_lb_backends"
 	AtomicTableProtocolTCP              AtomicTableProtocol  = "tcp"
 	AtomicTableProtocolUDP              AtomicTableProtocol  = "udp"
@@ -127,18 +127,18 @@ const (
 
 // AtomicTable defines an object in atomicTable table
 type AtomicTable struct {
-	UUID      string                ` + "`" + `ovsdb:"_uuid"` + "`" + `
-	EventType AtomicTableEventType  ` + "`" + `ovsdb:"event_type"` + "`" + `
-	Float     float64               ` + "`" + `ovsdb:"float"` + "`" + `
-	Int       int                   ` + "`" + `ovsdb:"int"` + "`" + `
-	Protocol  []AtomicTableProtocol ` + "`" + `ovsdb:"protocol"` + "`" + `
-	Str       string                ` + "`" + `ovsdb:"str"` + "`" + `
+	UUID      string               ` + "`" + `ovsdb:"_uuid"` + "`" + `
+	EventType AtomicTableEventType ` + "`" + `ovsdb:"event_type"` + "`" + `
+	Float     float64              ` + "`" + `ovsdb:"float"` + "`" + `
+	Int       int                  ` + "`" + `ovsdb:"int"` + "`" + `
+	Protocol  *AtomicTableProtocol ` + "`" + `ovsdb:"protocol"` + "`" + `
+	Str       string               ` + "`" + `ovsdb:"str"` + "`" + `
 
 	OtherUUID      string
 	OtherEventType string
 	OtherFloat     float64
 	OtherInt       int
-	OtherProtocol  []string
+	OtherProtocol  *string
 	OtherStr       string
 }
 `,
@@ -167,7 +167,7 @@ type (
 	AtomicTableProtocol  = string
 )
 
-const (
+var (
 	AtomicTableEventTypeEmptyLbBackends AtomicTableEventType = "empty_lb_backends"
 	AtomicTableProtocolTCP              AtomicTableProtocol  = "tcp"
 	AtomicTableProtocolUDP              AtomicTableProtocol  = "udp"
@@ -176,12 +176,12 @@ const (
 
 // AtomicTable defines an object in atomicTable table
 type AtomicTable struct {
-	UUID      string                ` + "`" + `ovsdb:"_uuid"` + "`" + `
-	EventType AtomicTableEventType  ` + "`" + `ovsdb:"event_type"` + "`" + `
-	Float     float64               ` + "`" + `ovsdb:"float"` + "`" + `
-	Int       int                   ` + "`" + `ovsdb:"int"` + "`" + `
-	Protocol  []AtomicTableProtocol ` + "`" + `ovsdb:"protocol"` + "`" + `
-	Str       string                ` + "`" + `ovsdb:"str"` + "`" + `
+	UUID      string               ` + "`" + `ovsdb:"_uuid"` + "`" + `
+	EventType AtomicTableEventType ` + "`" + `ovsdb:"event_type"` + "`" + `
+	Float     float64              ` + "`" + `ovsdb:"float"` + "`" + `
+	Int       int                  ` + "`" + `ovsdb:"int"` + "`" + `
+	Protocol  *AtomicTableProtocol ` + "`" + `ovsdb:"protocol"` + "`" + `
+	Str       string               ` + "`" + `ovsdb:"str"` + "`" + `
 }
 
 func TestFunc() string {

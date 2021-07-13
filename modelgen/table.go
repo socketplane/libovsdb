@@ -55,7 +55,7 @@ type (
 {{- end }}
 )
 
-const (
+var (
 {{ range  index . "Enums" }}
 {{- $e := . }}
 {{- range .Sets }}
@@ -167,6 +167,28 @@ func fieldType(tableName, columnName string, column *ovsdb.ColumnSchema, enumTyp
 		return fmt.Sprintf("map[%s]%s", AtomicType(column.TypeObj.Key.Type),
 			AtomicType(column.TypeObj.Value.Type))
 	case ovsdb.TypeSet:
+		// optional with max 1 element
+		if column.TypeObj.Min() == 0 && column.TypeObj.Max() == 1 {
+			if enumTypes && FieldEnum(tableName, columnName, column) != nil {
+				return fmt.Sprintf("*%s", enumName(tableName, columnName))
+			}
+			return fmt.Sprintf("*%s", AtomicType(column.TypeObj.Key.Type))
+		}
+		// required, max 1 element
+		if column.TypeObj.Min() == 1 && column.TypeObj.Max() == 1 {
+			if enumTypes && FieldEnum(tableName, columnName, column) != nil {
+				return enumName(tableName, columnName)
+			}
+			return AtomicType(column.TypeObj.Key.Type)
+		}
+		// use array for columns with max > 1
+		if column.TypeObj.Max() > 1 {
+			if enumTypes && FieldEnum(tableName, columnName, column) != nil {
+				return fmt.Sprintf("[%d]%s", column.TypeObj.Max(), enumName(tableName, columnName))
+			}
+			return fmt.Sprintf("[%d]%s", column.TypeObj.Max(), AtomicType(column.TypeObj.Key.Type))
+		}
+		// use a slice
 		if enumTypes && FieldEnum(tableName, columnName, column) != nil {
 			return fmt.Sprintf("[]%s", enumName(tableName, columnName))
 		}
