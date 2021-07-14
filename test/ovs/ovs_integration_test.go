@@ -55,8 +55,8 @@ func (suite *OVSIntegrationSuite) SetupSuite() {
 	suite.resource, err = suite.pool.RunWithOptions(options, hostConfig)
 	require.NoError(suite.T(), err)
 
-	// set expiry to 30 seconds so containers are cleaned up on test panic
-	err = suite.resource.Expire(30)
+	// set expiry to 60 seconds so containers are cleaned up on test panic
+	err = suite.resource.Expire(60)
 	require.NoError(suite.T(), err)
 
 	// let the container start before we attempt connection
@@ -75,6 +75,7 @@ func (suite *OVSIntegrationSuite) SetupSuite() {
 		}
 		err = ovs.Connect(ctx)
 		if err != nil {
+			suite.T().Log(err)
 			return err
 		}
 		suite.client = ovs
@@ -104,14 +105,22 @@ func TestOVSIntegrationTestSuite(t *testing.T) {
 	suite.Run(t, new(OVSIntegrationSuite))
 }
 
+type BridgeFailMode = string
+
+var (
+	BridgeFailModeStandalone BridgeFailMode = "standalone"
+	BridgeFailModeSecure     BridgeFailMode = "secure"
+)
+
 // bridgeType is the simplified ORM model of the Bridge table
 type bridgeType struct {
-	UUID        string            `ovsdb:"_uuid"`
-	Name        string            `ovsdb:"name"`
-	OtherConfig map[string]string `ovsdb:"other_config"`
-	ExternalIds map[string]string `ovsdb:"external_ids"`
-	Ports       []string          `ovsdb:"ports"`
-	Status      map[string]string `ovsdb:"status"`
+	UUID           string            `ovsdb:"_uuid"`
+	Name           string            `ovsdb:"name"`
+	OtherConfig    map[string]string `ovsdb:"other_config"`
+	ExternalIds    map[string]string `ovsdb:"external_ids"`
+	Ports          []string          `ovsdb:"ports"`
+	Status         map[string]string `ovsdb:"status"`
+	BridgeFailMode *BridgeFailMode   `ovsdb:"fail_mode"`
 }
 
 // ovsType is the simplified ORM model of the Bridge table
@@ -456,6 +465,7 @@ func (suite *OVSIntegrationSuite) createBridge(bridgeName string) (string, error
 			"go":     "awesome",
 			"docker": "made-for-each-other",
 		},
+		BridgeFailMode: &BridgeFailModeSecure,
 	}
 
 	insertOp, err := suite.client.Create(&br)

@@ -86,11 +86,10 @@ func TestValidateOvsSet(t *testing.T) {
 		t.Error("Expected: ", expected, "Got", string(data))
 	}
 	// Negative condition test
-	integer := 5
-	_, err = NewOvsSet(&integer)
+	oSet, err = NewOvsSet(struct{ foo string }{})
 	if err == nil {
 		t.Error("OvsSet must fail for anything other than Slices and atomic types")
-		t.Error("Expected: ", expected, "Got", string(data))
+		t.Error("Got", oSet)
 	}
 }
 

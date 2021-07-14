@@ -87,6 +87,8 @@ func TestOvsToNativeAndNativeToOvs(t *testing.T) {
 		"key3": {GoUUID: aUUID2},
 	})
 
+	singleStringSet, _ := NewOvsSet([]string{"foo"})
+
 	tests := []struct {
 		name   string
 		schema []byte
@@ -164,7 +166,8 @@ func TestOvsToNativeAndNativeToOvs(t *testing.T) {
 					"refType": "weak",
 					"type": "uuid"
 				},
-				"min": 0
+				"min": 0,
+				"max": "unlimited"
 				}
 			}`),
 			input:  uss,
@@ -180,7 +183,8 @@ func TestOvsToNativeAndNativeToOvs(t *testing.T) {
 						"refType": "weak",
 						"type": "uuid"
 					},
-					"min": 0
+					"min": 0,
+					"max": "unlimited"
 					}
 			}`),
 			input:  UUID{GoUUID: aUUID0},
@@ -356,6 +360,36 @@ func TestOvsToNativeAndNativeToOvs(t *testing.T) {
 			native: aUUIDMap,
 			ovs:    um,
 		},
+		{
+			name: "String set with min 0 max 1",
+			schema: []byte(`{
+			"type":{
+				"key": {
+				"type": "string"
+				},
+				"min": 0,
+				"max": 1
+			}
+			}`),
+			input:  singleStringSet,
+			native: &aString,
+			ovs:    singleStringSet,
+		},
+		{
+			name: "A string with min 0 max 1",
+			schema: []byte(`{
+			"type":{
+				"key": {
+				"type": "string"
+				},
+				"min": 0,
+				"max": 1
+			}
+			}`),
+			input:  aString,
+			native: &aString,
+			ovs:    singleStringSet,
+		},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -364,9 +398,9 @@ func TestOvsToNativeAndNativeToOvs(t *testing.T) {
 			require.NoError(t, err)
 
 			native, err := OvsToNative(&column, tt.input)
-			require.NoErrorf(t, err, "failed to convert %+v: %s", tt, err)
+			require.NoError(t, err)
 
-			require.Equalf(t, native, tt.native,
+			require.Equalf(t, tt.native, native,
 				"fail to convert ovs2native. input: %v(%s). expected %v(%s). got %v (%s)",
 				tt.input, reflect.TypeOf(tt.input),
 				tt.native, reflect.TypeOf(tt.native),
@@ -376,7 +410,7 @@ func TestOvsToNativeAndNativeToOvs(t *testing.T) {
 			ovs, err := NativeToOvs(&column, native)
 			require.NoErrorf(t, err, "failed to convert %s: %s", tt, err)
 
-			assert.Equalf(t, ovs, tt.ovs,
+			assert.Equalf(t, tt.ovs, ovs,
 				"fail to convert native2ovs. native: %v(%s). expected %v(%s). got %v (%s)",
 				native, reflect.TypeOf(native),
 				tt.ovs, reflect.TypeOf(tt.ovs),
