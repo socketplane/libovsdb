@@ -133,8 +133,8 @@ func TestClientServerInsert(t *testing.T) {
 	require.Nil(t, err)
 	reply, err := ovs.Transact(ops...)
 	assert.Nil(t, err)
-	_, err = ovsdb.CheckOperationResults(reply, ops)
-	assert.Nil(t, err)
+	opErr, err := ovsdb.CheckOperationResults(reply, ops)
+	assert.NoErrorf(t, err, "%+v", opErr)
 }
 
 func TestClientServerMonitor(t *testing.T) {

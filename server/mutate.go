@@ -6,6 +6,16 @@ import (
 	"github.com/ovn-org/libovsdb/ovsdb"
 )
 
+func removeFromSlice(a, b reflect.Value) reflect.Value {
+	for i := 0; i < a.Len(); i++ {
+		if a.Index(i).Interface() == b.Interface() {
+			v := reflect.AppendSlice(a.Slice(0, i), a.Slice(i+1, a.Len()))
+			return v
+		}
+	}
+	return a
+}
+
 func mutate(current interface{}, mutator ovsdb.Mutator, value interface{}) interface{} {
 	switch current.(type) {
 	case bool, string:

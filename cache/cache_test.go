@@ -247,7 +247,7 @@ func TestRowCacheCreateMultiIndex(t *testing.T) {
 			if tt.wantErr {
 				assert.Error(t, err)
 				if tt.wantIndexExistsErr {
-					assert.IsType(t, &IndexExistsError{}, err)
+					assert.IsType(t, &ErrIndexExists{}, err)
 				}
 			} else {
 				assert.Nil(t, err)
