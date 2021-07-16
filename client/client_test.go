@@ -1,6 +1,7 @@
 package client
 
 import (
+	"context"
 	"encoding/json"
 	"reflect"
 	"strings"
@@ -744,28 +745,28 @@ func TestOperationWhenNotConnected(t *testing.T) {
 		{
 			"echo",
 			func() error {
-				return ovs.Echo()
+				return ovs.Echo(context.Background())
 			},
 		},
 		{
 			"transact",
 			func() error {
 				comment := "this is only a test"
-				_, err := ovs.Transact(ovsdb.Operation{Op: ovsdb.OperationComment, Comment: &comment})
+				_, err := ovs.Transact(context.Background(), ovsdb.Operation{Op: ovsdb.OperationComment, Comment: &comment})
 				return err
 			},
 		},
 		{
 			"monitor/monitor all",
 			func() error {
-				_, err := ovs.MonitorAll()
+				_, err := ovs.MonitorAll(context.Background())
 				return err
 			},
 		},
 		{
 			"monitor cancel",
 			func() error {
-				return ovs.MonitorCancel("")
+				return ovs.MonitorCancel(context.Background(), "")
 			},
 		},
 	}

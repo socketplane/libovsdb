@@ -86,7 +86,7 @@ func TestClientServerEcho(t *testing.T) {
 	require.NoError(t, err)
 	err = ovs.Connect(context.Background())
 	require.NoError(t, err)
-	err = ovs.Echo()
+	err = ovs.Echo(context.Background())
 	assert.Nil(t, err)
 }
 
@@ -131,7 +131,7 @@ func TestClientServerInsert(t *testing.T) {
 
 	ops, err := ovs.Create(bridgeRow)
 	require.Nil(t, err)
-	reply, err := ovs.Transact(ops...)
+	reply, err := ovs.Transact(context.Background(), ops...)
 	assert.Nil(t, err)
 	_, err = ovsdb.CheckOperationResults(reply, ops)
 	assert.Nil(t, err)
@@ -219,14 +219,14 @@ func TestClientServerMonitor(t *testing.T) {
 	var ops []ovsdb.Operation
 	ovsOps, err := ovs.Create(ovsRow)
 	require.Nil(t, err)
-	reply, err := ovs.Transact(ovsOps...)
+	reply, err := ovs.Transact(context.Background(), ovsOps...)
 	require.Nil(t, err)
 	_, err = ovsdb.CheckOperationResults(reply, ovsOps)
 	require.Nil(t, err)
 	require.NotEmpty(t, reply[0].UUID.GoUUID)
 	ovsRow.UUID = reply[0].UUID.GoUUID
 
-	_, err = ovs.MonitorAll()
+	_, err = ovs.MonitorAll(context.Background())
 	require.Nil(t, err)
 	require.Eventually(t, func() bool {
 		seenMutex.RLock()
@@ -246,7 +246,7 @@ func TestClientServerMonitor(t *testing.T) {
 	require.Nil(t, err)
 	ops = append(ops, mutateOps...)
 
-	reply, err = ovs.Transact(ops...)
+	reply, err = ovs.Transact(context.Background(), ops...)
 	require.Nil(t, err)
 
 	_, err = ovsdb.CheckOperationResults(reply, ops)
@@ -306,7 +306,7 @@ func TestClientServerInsertAndDelete(t *testing.T) {
 
 	ops, err := ovs.Create(bridgeRow)
 	require.Nil(t, err)
-	reply, err := ovs.Transact(ops...)
+	reply, err := ovs.Transact(context.Background(), ops...)
 	require.Nil(t, err)
 	_, err = ovsdb.CheckOperationResults(reply, ops)
 	require.Nil(t, err)
@@ -316,7 +316,7 @@ func TestClientServerInsertAndDelete(t *testing.T) {
 	deleteOp, err := ovs.Where(bridgeRow).Delete()
 	require.Nil(t, err)
 
-	reply, err = ovs.Transact(deleteOp...)
+	reply, err = ovs.Transact(context.Background(), deleteOp...)
 	assert.Nil(t, err)
 	_, err = ovsdb.CheckOperationResults(reply, ops)
 	assert.Nil(t, err)
@@ -354,7 +354,8 @@ func TestClientServerInsertDuplicate(t *testing.T) {
 
 	ovs, err := client.NewOVSDBClient(defDB, client.WithEndpoint(fmt.Sprintf("unix:%s", tmpfile)))
 	require.NoError(t, err)
-	err = ovs.Connect(context.Background())
+	ctx := context.Background()
+	err = ovs.Connect(ctx)
 	require.NoError(t, err)
 
 	bridgeRow := &bridgeType{
@@ -364,13 +365,13 @@ func TestClientServerInsertDuplicate(t *testing.T) {
 
 	ops, err := ovs.Create(bridgeRow)
 	require.Nil(t, err)
-	reply, err := ovs.Transact(ops...)
+	reply, err := ovs.Transact(ctx, ops...)
 	require.Nil(t, err)
 	_, err = ovsdb.CheckOperationResults(reply, ops)
 	require.Nil(t, err)
 
 	// duplicate
-	reply, err = ovs.Transact(ops...)
+	reply, err = ovs.Transact(ctx, ops...)
 	require.Nil(t, err)
 	opErrs, err := ovsdb.CheckOperationResults(reply, ops)
 	require.Error(t, err)
