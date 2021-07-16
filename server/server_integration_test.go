@@ -6,6 +6,7 @@ import (
 	"math/rand"
 	"os"
 	"path/filepath"
+	"reflect"
 	"sync"
 	"testing"
 	"time"
@@ -123,6 +124,8 @@ func TestClientServerInsert(t *testing.T) {
 	require.NoError(t, err)
 	err = ovs.Connect(context.Background())
 	require.NoError(t, err)
+	_, err = ovs.MonitorAll()
+	require.NoError(t, err)
 
 	bridgeRow := &bridgeType{
 		Name:        "foo",
@@ -135,6 +138,12 @@ func TestClientServerInsert(t *testing.T) {
 	assert.Nil(t, err)
 	_, err = ovsdb.CheckOperationResults(reply, ops)
 	assert.Nil(t, err)
+	uuid := reply[0].UUID.GoUUID
+	require.Eventually(t, func() bool {
+		br := &bridgeType{UUID: uuid}
+		err := ovs.Get(br)
+		return err == nil
+	}, 2*time.Second, 500*time.Millisecond)
 }
 
 func TestClientServerMonitor(t *testing.T) {
@@ -298,6 +307,8 @@ func TestClientServerInsertAndDelete(t *testing.T) {
 	require.NoError(t, err)
 	err = ovs.Connect(context.Background())
 	require.NoError(t, err)
+	_, err = ovs.MonitorAll()
+	require.NoError(t, err)
 
 	bridgeRow := &bridgeType{
 		Name:        "foo",
@@ -311,8 +322,14 @@ func TestClientServerInsertAndDelete(t *testing.T) {
 	_, err = ovsdb.CheckOperationResults(reply, ops)
 	require.Nil(t, err)
 
-	bridgeRow.UUID = reply[0].UUID.GoUUID
+	uuid := reply[0].UUID.GoUUID
+	assert.Eventually(t, func() bool {
+		br := &bridgeType{UUID: uuid}
+		err := ovs.Get(br)
+		return err == nil
+	}, 2*time.Second, 500*time.Millisecond)
 
+	bridgeRow.UUID = uuid
 	deleteOp, err := ovs.Where(bridgeRow).Delete()
 	require.Nil(t, err)
 
@@ -376,4 +393,114 @@ func TestClientServerInsertDuplicate(t *testing.T) {
 	require.Error(t, err)
 	require.Error(t, opErrs[0])
 	require.IsTypef(t, &ovsdb.ConstraintViolation{}, opErrs[0], opErrs[0].Error())
+}
+
+func TestClientServerInsertAndUpdate(t *testing.T) {
+	defDB, err := model.NewDBModel("Open_vSwitch", map[string]model.Model{
+		"Open_vSwitch": &ovsType{},
+		"Bridge":       &bridgeType{}})
+	require.Nil(t, err)
+
+	schema, err := getSchema()
+	require.Nil(t, err)
+
+	ovsDB := NewInMemoryDatabase(map[string]*model.DBModel{"Open_vSwitch": defDB})
+	rand.Seed(time.Now().UnixNano())
+	tmpfile := fmt.Sprintf("/tmp/ovsdb-%d.sock", rand.Intn(10000))
+	defer os.Remove(tmpfile)
+	server, err := NewOvsdbServer(ovsDB, DatabaseModel{
+		Model:  defDB,
+		Schema: schema,
+	})
+	assert.Nil(t, err)
+
+	go func(t *testing.T, o *OvsdbServer) {
+		if err := o.Serve("unix", tmpfile); err != nil {
+			t.Error(err)
+		}
+	}(t, server)
+	defer server.Close()
+	require.Eventually(t, func() bool {
+		return server.Ready()
+	}, 1*time.Second, 10*time.Millisecond)
+
+	ovs, err := client.NewOVSDBClient(defDB, client.WithEndpoint(fmt.Sprintf("unix:%s", tmpfile)))
+	require.NoError(t, err)
+	err = ovs.Connect(context.Background())
+	require.NoError(t, err)
+	defer ovs.Disconnect()
+
+	_, err = ovs.MonitorAll()
+	require.NoError(t, err)
+
+	bridgeRow := &bridgeType{
+		Name:        "br-update",
+		ExternalIds: map[string]string{"go": "awesome", "docker": "made-for-each-other"},
+	}
+
+	ops, err := ovs.Create(bridgeRow)
+	require.NoError(t, err)
+	reply, err := ovs.Transact(ops...)
+	require.NoError(t, err)
+	_, err = ovsdb.CheckOperationResults(reply, ops)
+	require.NoError(t, err)
+
+	uuid := reply[0].UUID.GoUUID
+	assert.Eventually(t, func() bool {
+		br := &bridgeType{UUID: uuid}
+		err := ovs.Get(br)
+		return err == nil
+	}, 2*time.Second, 500*time.Millisecond)
+
+	// try to modify immutable field
+	bridgeRow.UUID = uuid
+	bridgeRow.Name = "br-update2"
+	ops, err = ovs.Where(bridgeRow).Update(bridgeRow)
+	require.NoError(t, err)
+	reply, err = ovs.Transact(ops...)
+	require.NoError(t, err)
+	_, err = ovsdb.CheckOperationResults(reply, ops)
+	require.Error(t, err)
+	bridgeRow.Name = "br-update"
+
+	/* FIXME: https://github.com/ovn-org/libovsdb/issues/203
+	// update many fields
+	bridgeRow.UUID = uuid
+	bridgeRow.Name = "br-update"
+	bridgeRow.ExternalIds["baz"] = "foobar"
+	bridgeRow.OtherConfig = map[string]string{"foo": "bar"}
+	ops, err = ovs.Where(bridgeRow).Update(bridgeRow)
+	require.NoError(t, err)
+	reply, err = ovs.Transact(ops...)
+	require.NoError(t, err)
+	opErrs, err := ovsdb.CheckOperationResults(reply, ops)
+	require.NoErrorf(t, err, "%+v", opErrs)
+
+	require.Eventually(t, func() bool {
+		br := &bridgeType{UUID: uuid}
+		err = ovs.Get(br)
+		if err != nil {
+			return false
+		}
+		return reflect.DeepEqual(br, bridgeRow)
+	}, 2*time.Second, 50*time.Millisecond)
+	*/
+
+	newExternalIds := map[string]string{"foo": "bar"}
+	bridgeRow.ExternalIds = newExternalIds
+	ops, err = ovs.Where(bridgeRow).Update(bridgeRow, &bridgeRow.ExternalIds)
+	require.NoError(t, err)
+	reply, err = ovs.Transact(ops...)
+	require.NoError(t, err)
+	_, err = ovsdb.CheckOperationResults(reply, ops)
+	require.NoError(t, err)
+
+	assert.Eventually(t, func() bool {
+		br := &bridgeType{UUID: uuid}
+		err = ovs.Get(br)
+		if err != nil {
+			return false
+		}
+		return reflect.DeepEqual(br, bridgeRow)
+	}, 2*time.Second, 500*time.Millisecond)
 }

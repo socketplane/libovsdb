@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"os"
+	"reflect"
 	"strings"
 	"testing"
 	"time"
@@ -340,14 +341,25 @@ LOOP:
 
 func (suite *OVSIntegrationSuite) TestInsertTransactIntegration() {
 	bridgeName := "gopher-br7"
-	_, err := suite.createBridge(bridgeName)
+	uuid, err := suite.createBridge(bridgeName)
 	require.NoError(suite.T(), err)
+	require.Eventually(suite.T(), func() bool {
+		br := &bridgeType{UUID: uuid}
+		err := suite.client.Get(br)
+		return err == nil
+	}, 2*time.Second, 500*time.Millisecond)
 }
 
 func (suite *OVSIntegrationSuite) TestInsertAndDeleteTransactIntegration() {
 	bridgeName := "gopher-br5"
 	bridgeUUID, err := suite.createBridge(bridgeName)
 	require.NoError(suite.T(), err)
+
+	require.Eventually(suite.T(), func() bool {
+		br := &bridgeType{UUID: bridgeUUID}
+		err := suite.client.Get(br)
+		return err == nil
+	}, 2*time.Second, 500*time.Millisecond)
 
 	deleteOp, err := suite.client.Where(&bridgeType{Name: bridgeName}).Delete()
 	require.NoError(suite.T(), err)
@@ -435,15 +447,98 @@ func (suite *OVSIntegrationSuite) TestMonitorCancelIntegration() {
 
 	err = suite.client.MonitorCancel(monitorID)
 	assert.NoError(suite.T(), err)
+
+	uuid, err := suite.createBridge("br-monitor")
+	require.NoError(suite.T(), err)
+
+	assert.Eventually(suite.T(), func() bool {
+		br := &bridgeType{UUID: uuid}
+		err = suite.client.Get(br)
+		return err == nil
+	}, 2*time.Second, 500*time.Millisecond)
 }
 
 func (suite *OVSIntegrationSuite) TestInsertDuplicateTransactIntegration() {
-	_, err := suite.createBridge("br-dup")
+	uuid, err := suite.createBridge("br-dup")
 	require.NoError(suite.T(), err)
+
+	require.Eventually(suite.T(), func() bool {
+		br := &bridgeType{UUID: uuid}
+		err := suite.client.Get(br)
+		return err == nil
+	}, 2*time.Second, 500*time.Millisecond)
 
 	_, err = suite.createBridge("br-dup")
 	assert.Error(suite.T(), err)
 	assert.IsType(suite.T(), &ovsdb.ConstraintViolation{}, err)
+}
+
+func (suite *OVSIntegrationSuite) TestUpdate() {
+	uuid, err := suite.createBridge("br-update")
+	require.NoError(suite.T(), err)
+
+	require.Eventually(suite.T(), func() bool {
+		br := &bridgeType{UUID: uuid}
+		err := suite.client.Get(br)
+		return err == nil
+	}, 2*time.Second, 500*time.Millisecond)
+
+	bridgeRow := &bridgeType{UUID: uuid}
+	err = suite.client.Get(bridgeRow)
+	require.NoError(suite.T(), err)
+
+	// FIXME: https://github.com/ovn-org/libovsdb/issues/203
+	/*
+		// update many fields
+		bridgeRow.UUID = uuid
+		bridgeRow.ExternalIds["baz"] = "foobar"
+		bridgeRow.OtherConfig = map[string]string{"foo": "bar"}
+		ops, err = suite.client.Where(bridgeRow).Update(bridgeRow)
+		require.NoError(suite.T(), err)
+		reply, err = suite.client.Transact(ops...)
+		require.NoError(suite.T(), err)
+		opErrs, err := ovsdb.CheckOperationResults(reply, ops)
+		require.NoErrorf(suite.T(), err, "%+v", opErrs)
+
+		require.Eventually(suite.T(), func() bool {
+			br := &bridgeType{UUID: uuid}
+			err = suite.client.Get(br)
+			if err != nil {
+				return false
+			}
+			return reflect.DeepEqual(bridgeRow, br)
+		}, 2*time.Second, 500*time.Millisecond)
+
+	*/
+
+	// try to modify immutable field
+	bridgeRow.Name = "br-update2"
+	ops, err := suite.client.Where(bridgeRow).Update(bridgeRow)
+	require.NoError(suite.T(), err)
+	reply, err := suite.client.Transact(ops...)
+	require.NoError(suite.T(), err)
+	_, err = ovsdb.CheckOperationResults(reply, ops)
+	require.Error(suite.T(), err)
+	// set name back again
+	bridgeRow.Name = "br-update"
+
+	newExternalIds := map[string]string{"foo": "bar"}
+	bridgeRow.ExternalIds = newExternalIds
+	ops, err = suite.client.Where(bridgeRow).Update(bridgeRow, &bridgeRow.ExternalIds)
+	require.NoError(suite.T(), err)
+	reply, err = suite.client.Transact(ops...)
+	require.NoError(suite.T(), err)
+	_, err = ovsdb.CheckOperationResults(reply, ops)
+	require.NoError(suite.T(), err)
+
+	assert.Eventually(suite.T(), func() bool {
+		br := &bridgeType{UUID: uuid}
+		err = suite.client.Get(br)
+		if err != nil {
+			return false
+		}
+		return reflect.DeepEqual(bridgeRow, br)
+	}, 2*time.Second, 500*time.Millisecond)
 }
 
 func (suite *OVSIntegrationSuite) createBridge(bridgeName string) (string, error) {
