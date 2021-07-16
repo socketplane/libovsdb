@@ -216,23 +216,52 @@ func (db *inMemoryDatabase) Update(database, table string, where []ovsdb.Conditi
 			Error: err.Error(),
 		}, nil
 	}
+
 	for _, old := range rows {
 		info, _ := mapper.NewInfo(schema, old)
 		uuid, _ := info.FieldByColumn("_uuid")
+
 		oldRow, err := targetDb.Mapper().NewRow(table, old)
 		if err != nil {
 			panic(err)
 		}
-		newRow, err := targetDb.Mapper().NewRow(table, row)
+
+		for column, value := range row {
+			colSchema := schema.Column(column)
+			if colSchema == nil {
+				e := ovsdb.ConstraintViolation{}
+				return ovsdb.OperationResult{
+					Error:   e.Error(),
+					Details: fmt.Sprintf("%s is not a valid column in the %s table", column, table),
+				}, nil
+			}
+			if !colSchema.Mutable() {
+				e := ovsdb.ConstraintViolation{}
+				return ovsdb.OperationResult{
+					Error:   e.Error(),
+					Details: fmt.Sprintf("column %s is of table %s not mutable", column, table),
+				}, nil
+			}
+			native, err := ovsdb.OvsToNative(colSchema, value)
+			if err != nil {
+				panic(err)
+			}
+			err = info.SetField(column, native)
+			if err != nil {
+				panic(err)
+			}
+		}
+
+		newRow, err := targetDb.Mapper().NewRow(table, old)
 		if err != nil {
 			panic(err)
 		}
-		if err = targetDb.Table(table).Update(uuid.(string), row, true); err != nil {
+
+		if err = targetDb.Table(table).Update(uuid.(string), old, true); err != nil {
 			if indexErr, ok := err.(*cache.IndexExistsError); ok {
 				e := ovsdb.ConstraintViolation{}
 				return ovsdb.OperationResult{
-					Error: e.Error(),
-
+					Error:   e.Error(),
 					Details: indexErr.Error(),
 				}, nil
 			}
