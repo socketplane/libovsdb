@@ -40,26 +40,26 @@ const (
 // Bridge defines an object in Bridge table
 type Bridge struct {
 	UUID                string            `ovsdb:"_uuid"`
-	AutoAttach          []string          `ovsdb:"auto_attach"`
+	AutoAttach          *string           `ovsdb:"auto_attach"`
 	Controller          []string          `ovsdb:"controller"`
-	DatapathID          []string          `ovsdb:"datapath_id"`
+	DatapathID          *string           `ovsdb:"datapath_id"`
 	DatapathType        string            `ovsdb:"datapath_type"`
 	DatapathVersion     string            `ovsdb:"datapath_version"`
 	ExternalIDs         map[string]string `ovsdb:"external_ids"`
-	FailMode            []BridgeFailMode  `ovsdb:"fail_mode"`
-	FloodVLANs          []int             `ovsdb:"flood_vlans"`
+	FailMode            *BridgeFailMode   `ovsdb:"fail_mode"`
+	FloodVLANs          [4096]int         `ovsdb:"flood_vlans"`
 	FlowTables          map[int]string    `ovsdb:"flow_tables"`
-	IPFIX               []string          `ovsdb:"ipfix"`
+	IPFIX               *string           `ovsdb:"ipfix"`
 	McastSnoopingEnable bool              `ovsdb:"mcast_snooping_enable"`
 	Mirrors             []string          `ovsdb:"mirrors"`
 	Name                string            `ovsdb:"name"`
-	Netflow             []string          `ovsdb:"netflow"`
+	Netflow             *string           `ovsdb:"netflow"`
 	OtherConfig         map[string]string `ovsdb:"other_config"`
 	Ports               []string          `ovsdb:"ports"`
 	Protocols           []BridgeProtocols `ovsdb:"protocols"`
 	RSTPEnable          bool              `ovsdb:"rstp_enable"`
 	RSTPStatus          map[string]string `ovsdb:"rstp_status"`
-	Sflow               []string          `ovsdb:"sflow"`
+	Sflow               *string           `ovsdb:"sflow"`
 	Status              map[string]string `ovsdb:"status"`
 	STPEnable           bool              `ovsdb:"stp_enable"`
 }
@@ -71,19 +71,19 @@ type OpenvSwitch struct {
 	CurCfg          int               `ovsdb:"cur_cfg"`
 	DatapathTypes   []string          `ovsdb:"datapath_types"`
 	Datapaths       map[string]string `ovsdb:"datapaths"`
-	DbVersion       []string          `ovsdb:"db_version"`
+	DbVersion       *string           `ovsdb:"db_version"`
 	DpdkInitialized bool              `ovsdb:"dpdk_initialized"`
-	DpdkVersion     []string          `ovsdb:"dpdk_version"`
+	DpdkVersion     *string           `ovsdb:"dpdk_version"`
 	ExternalIDs     map[string]string `ovsdb:"external_ids"`
 	IfaceTypes      []string          `ovsdb:"iface_types"`
 	ManagerOptions  []string          `ovsdb:"manager_options"`
 	NextCfg         int               `ovsdb:"next_cfg"`
 	OtherConfig     map[string]string `ovsdb:"other_config"`
-	OVSVersion      []string          `ovsdb:"ovs_version"`
-	SSL             []string          `ovsdb:"ssl"`
+	OVSVersion      *string           `ovsdb:"ovs_version"`
+	SSL             *string           `ovsdb:"ssl"`
 	Statistics      map[string]string `ovsdb:"statistics"`
-	SystemType      []string          `ovsdb:"system_type"`
-	SystemVersion   []string          `ovsdb:"system_version"`
+	SystemType      *string           `ovsdb:"system_type"`
+	SystemVersion   *string           `ovsdb:"system_version"`
 }
 
 var defDB, _ = model.NewDBModel("Open_vSwitch",

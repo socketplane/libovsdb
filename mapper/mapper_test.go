@@ -33,7 +33,7 @@ var (
 	}
 	aFloat = 42.00
 
-	aFloatSet = []float64{
+	aFloatSet = [10]float64{
 		3.0,
 		2.0,
 		42.0,
@@ -77,7 +77,8 @@ var testSchema = []byte(`{
               "refType": "weak",
               "type": "uuid"
             },
-            "min": 0
+            "min": 0,
+			"max": "unlimited"
           }
         },
         "aUUID": {
@@ -187,12 +188,12 @@ func TestMapperGetData(t *testing.T) {
 	type ormTestType struct {
 		AString             string            `ovsdb:"aString"`
 		ASet                []string          `ovsdb:"aSet"`
-		ASingleSet          []string          `ovsdb:"aSingleSet"`
+		ASingleSet          *string           `ovsdb:"aSingleSet"`
 		AUUIDSet            []string          `ovsdb:"aUUIDSet"`
 		AUUID               string            `ovsdb:"aUUID"`
 		AIntSet             []int             `ovsdb:"aIntSet"`
 		AFloat              float64           `ovsdb:"aFloat"`
-		AFloatSet           []float64         `ovsdb:"aFloatSet"`
+		AFloatSet           [10]float64       `ovsdb:"aFloatSet"`
 		YetAnotherStringSet []string          `ovsdb:"aEmptySet"`
 		AEnum               string            `ovsdb:"aEnum"`
 		AMap                map[string]string `ovsdb:"aMap"`
@@ -202,7 +203,7 @@ func TestMapperGetData(t *testing.T) {
 	var expected = ormTestType{
 		AString:             aString,
 		ASet:                aSet,
-		ASingleSet:          []string{aString},
+		ASingleSet:          &aString,
 		AUUIDSet:            aUUIDSet,
 		AUUID:               aUUID0,
 		AIntSet:             aIntSet,
@@ -304,7 +305,7 @@ func TestMapperNewRow(t *testing.T) {
 	}, {
 		name: "aFloatSet",
 		objInput: &struct {
-			MyFloatSet []float64 `ovsdb:"aFloatSet"`
+			MyFloatSet [10]float64 `ovsdb:"aFloatSet"`
 		}{
 			MyFloatSet: aFloatSet,
 		},
@@ -880,7 +881,8 @@ func TestMapperMutation(t *testing.T) {
         "set": {
           "type": {
             "key": "string",
-            "min": 0
+            "min": 0,
+			"max": "unlimited"
           }
         },
         "map": {

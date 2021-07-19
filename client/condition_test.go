@@ -16,25 +16,25 @@ func TestEqualityConditional(t *testing.T) {
 			UUID:        aUUID0,
 			Name:        "lsp0",
 			ExternalIds: map[string]string{"foo": "bar"},
-			Enabled:     []bool{true},
+			Enabled:     &trueVal,
 		},
 		&testLogicalSwitchPort{
 			UUID:        aUUID1,
 			Name:        "lsp1",
 			ExternalIds: map[string]string{"foo": "baz"},
-			Enabled:     []bool{false},
+			Enabled:     &falseVal,
 		},
 		&testLogicalSwitchPort{
 			UUID:        aUUID2,
 			Name:        "lsp2",
 			ExternalIds: map[string]string{"unique": "id"},
-			Enabled:     []bool{false},
+			Enabled:     &falseVal,
 		},
 		&testLogicalSwitchPort{
 			UUID:        aUUID3,
 			Name:        "lsp3",
 			ExternalIds: map[string]string{"foo": "baz"},
-			Enabled:     []bool{true},
+			Enabled:     &trueVal,
 		},
 	}
 	lspcache := map[string]model.Model{}
@@ -156,25 +156,25 @@ func TestPredicateConditional(t *testing.T) {
 			UUID:        aUUID0,
 			Name:        "lsp0",
 			ExternalIds: map[string]string{"foo": "bar"},
-			Enabled:     []bool{true},
+			Enabled:     &trueVal,
 		},
 		&testLogicalSwitchPort{
 			UUID:        aUUID1,
 			Name:        "lsp1",
 			ExternalIds: map[string]string{"foo": "baz"},
-			Enabled:     []bool{false},
+			Enabled:     &falseVal,
 		},
 		&testLogicalSwitchPort{
 			UUID:        aUUID2,
 			Name:        "lsp2",
 			ExternalIds: map[string]string{"unique": "id"},
-			Enabled:     []bool{false},
+			Enabled:     &falseVal,
 		},
 		&testLogicalSwitchPort{
 			UUID:        aUUID3,
 			Name:        "lsp3",
 			ExternalIds: map[string]string{"foo": "baz"},
-			Enabled:     []bool{true},
+			Enabled:     &trueVal,
 		},
 	}
 	lspcache := map[string]model.Model{}
@@ -214,7 +214,7 @@ func TestPredicateConditional(t *testing.T) {
 		{
 			name: "by random field",
 			predicate: func(lsp *testLogicalSwitchPort) bool {
-				return lsp.Enabled[0] == false
+				return lsp.Enabled != nil && *lsp.Enabled == false
 			},
 			condition: [][]ovsdb.Condition{
 				{
@@ -230,8 +230,8 @@ func TestPredicateConditional(t *testing.T) {
 						Value:    ovsdb.UUID{GoUUID: aUUID2},
 					}}},
 			matches: map[model.Model]bool{
-				&testLogicalSwitchPort{UUID: aUUID1, Enabled: []bool{true}}:  false,
-				&testLogicalSwitchPort{UUID: aUUID1, Enabled: []bool{false}}: true,
+				&testLogicalSwitchPort{UUID: aUUID1, Enabled: &trueVal}:  false,
+				&testLogicalSwitchPort{UUID: aUUID1, Enabled: &falseVal}: true,
 			},
 		},
 	}
@@ -265,25 +265,25 @@ func TestExplicitConditional(t *testing.T) {
 			UUID:        aUUID0,
 			Name:        "lsp0",
 			ExternalIds: map[string]string{"foo": "bar"},
-			Enabled:     []bool{true},
+			Enabled:     &trueVal,
 		},
 		&testLogicalSwitchPort{
 			UUID:        aUUID1,
 			Name:        "lsp1",
 			ExternalIds: map[string]string{"foo": "baz"},
-			Enabled:     []bool{false},
+			Enabled:     &falseVal,
 		},
 		&testLogicalSwitchPort{
 			UUID:        aUUID2,
 			Name:        "lsp2",
 			ExternalIds: map[string]string{"unique": "id"},
-			Enabled:     []bool{false},
+			Enabled:     &falseVal,
 		},
 		&testLogicalSwitchPort{
 			UUID:        aUUID3,
 			Name:        "lsp3",
 			ExternalIds: map[string]string{"foo": "baz"},
-			Enabled:     []bool{true},
+			Enabled:     &trueVal,
 		},
 	}
 	lspcache := map[string]model.Model{}
@@ -362,7 +362,7 @@ func TestExplicitConditional(t *testing.T) {
 				{
 					Field:    &testObj.Enabled,
 					Function: ovsdb.ConditionEqual,
-					Value:    []bool{true},
+					Value:    &trueVal,
 				},
 			},
 			result: [][]ovsdb.Condition{
@@ -370,7 +370,7 @@ func TestExplicitConditional(t *testing.T) {
 					{
 						Column:   "enabled",
 						Function: ovsdb.ConditionEqual,
-						Value:    testOvsSet(t, []bool{true}),
+						Value:    testOvsSet(t, &trueVal),
 					}}},
 		},
 		{
@@ -379,7 +379,7 @@ func TestExplicitConditional(t *testing.T) {
 				{
 					Field:    &testObj.Enabled,
 					Function: ovsdb.ConditionEqual,
-					Value:    []bool{true},
+					Value:    &trueVal,
 				},
 				{
 					Field:    &testObj.Name,
@@ -392,7 +392,7 @@ func TestExplicitConditional(t *testing.T) {
 					{
 						Column:   "enabled",
 						Function: ovsdb.ConditionEqual,
-						Value:    testOvsSet(t, []bool{true}),
+						Value:    testOvsSet(t, &trueVal),
 					}},
 				{
 					{
@@ -407,7 +407,7 @@ func TestExplicitConditional(t *testing.T) {
 				{
 					Field:    &testObj.Enabled,
 					Function: ovsdb.ConditionEqual,
-					Value:    []bool{true},
+					Value:    &trueVal,
 				},
 				{
 					Field:    &testObj.Name,
@@ -419,7 +419,7 @@ func TestExplicitConditional(t *testing.T) {
 				{
 					Column:   "enabled",
 					Function: ovsdb.ConditionEqual,
-					Value:    testOvsSet(t, []bool{true}),
+					Value:    testOvsSet(t, &trueVal),
 				},
 				{
 					Column:   "name",

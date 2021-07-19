@@ -9,6 +9,14 @@ import (
 	"github.com/ovn-org/libovsdb/model"
 	"github.com/ovn-org/libovsdb/ovsdb"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
+)
+
+var (
+	trueVal  = true
+	falseVal = false
+	one      = 1
+	six      = 6
 )
 
 func TestAPIListSimple(t *testing.T) {
@@ -222,25 +230,25 @@ func TestAPIListFields(t *testing.T) {
 			UUID:        aUUID0,
 			Name:        "lsp0",
 			ExternalIds: map[string]string{"foo": "bar"},
-			Enabled:     []bool{true},
+			Enabled:     &trueVal,
 		},
 		&testLogicalSwitchPort{
 			UUID:        aUUID1,
 			Name:        "magiclsp1",
 			ExternalIds: map[string]string{"foo": "baz"},
-			Enabled:     []bool{false},
+			Enabled:     &falseVal,
 		},
 		&testLogicalSwitchPort{
 			UUID:        aUUID2,
 			Name:        "lsp2",
 			ExternalIds: map[string]string{"unique": "id"},
-			Enabled:     []bool{false},
+			Enabled:     &falseVal,
 		},
 		&testLogicalSwitchPort{
 			UUID:        aUUID3,
 			Name:        "magiclsp2",
 			ExternalIds: map[string]string{"foo": "baz"},
-			Enabled:     []bool{true},
+			Enabled:     &trueVal,
 		},
 	}
 	lspcache := map[string]model.Model{}
@@ -624,22 +632,22 @@ func TestAPIMutate(t *testing.T) {
 			Name:        "lsp0",
 			Type:        "someType",
 			ExternalIds: map[string]string{"foo": "bar"},
-			Enabled:     []bool{true},
-			Tag:         []int{1},
+			Enabled:     &trueVal,
+			Tag:         &one,
 		},
 		aUUID1: &testLogicalSwitchPort{
 			UUID:        aUUID1,
 			Name:        "lsp1",
 			Type:        "someType",
 			ExternalIds: map[string]string{"foo": "baz"},
-			Tag:         []int{1},
+			Tag:         &one,
 		},
 		aUUID2: &testLogicalSwitchPort{
 			UUID:        aUUID2,
 			Name:        "lsp2",
 			Type:        "someOtherType",
 			ExternalIds: map[string]string{"foo": "baz"},
-			Tag:         []int{1},
+			Tag:         &one,
 		},
 	}
 	testData := cache.Data{
@@ -648,7 +656,6 @@ func TestAPIMutate(t *testing.T) {
 	tcache := apiTestCache(t, testData)
 
 	testObj := testLogicalSwitchPort{}
-
 	test := []struct {
 		name      string
 		condition func(API) ConditionalAPI
@@ -667,16 +674,16 @@ func TestAPIMutate(t *testing.T) {
 			},
 			mutations: []model.Mutation{
 				{
-					Field:   &testObj.Tag,
+					Field:   &testObj.Addresses,
 					Mutator: ovsdb.MutateOperationInsert,
-					Value:   []int{5},
+					Value:   []string{"1.1.1.1"},
 				},
 			},
 			result: []ovsdb.Operation{
 				{
 					Op:        ovsdb.OperationMutate,
 					Table:     "Logical_Switch_Port",
-					Mutations: []ovsdb.Mutation{{Column: "tag", Mutator: ovsdb.MutateOperationInsert, Value: testOvsSet(t, []int{5})}},
+					Mutations: []ovsdb.Mutation{{Column: "addresses", Mutator: ovsdb.MutateOperationInsert, Value: testOvsSet(t, []string{"1.1.1.1"})}},
 					Where:     []ovsdb.Condition{{Column: "_uuid", Function: ovsdb.ConditionEqual, Value: ovsdb.UUID{GoUUID: aUUID0}}},
 				},
 			},
@@ -777,9 +784,9 @@ func TestAPIMutate(t *testing.T) {
 			cond := tt.condition(api)
 			ops, err := cond.Mutate(&testObj, tt.mutations...)
 			if tt.err {
-				assert.NotNil(t, err)
+				require.Error(t, err)
 			} else {
-				assert.Nil(t, err)
+				require.Nil(t, err)
 				assert.ElementsMatchf(t, tt.result, ops, "ovsdb.Operations should match")
 			}
 		})
@@ -793,23 +800,23 @@ func TestAPIUpdate(t *testing.T) {
 			Name:        "lsp0",
 			Type:        "someType",
 			ExternalIds: map[string]string{"foo": "bar"},
-			Enabled:     []bool{true},
-			Tag:         []int{1},
+			Enabled:     &trueVal,
+			Tag:         &one,
 		},
 		aUUID1: &testLogicalSwitchPort{
 			UUID:        aUUID1,
 			Name:        "lsp1",
 			Type:        "someType",
 			ExternalIds: map[string]string{"foo": "baz"},
-			Tag:         []int{1},
-			Enabled:     []bool{true},
+			Tag:         &one,
+			Enabled:     &trueVal,
 		},
 		aUUID2: &testLogicalSwitchPort{
 			UUID:        aUUID2,
 			Name:        "lsp2",
 			Type:        "someOtherType",
 			ExternalIds: map[string]string{"foo": "baz"},
-			Tag:         []int{1},
+			Tag:         &one,
 		},
 	}
 	testData := cache.Data{
@@ -836,7 +843,7 @@ func TestAPIUpdate(t *testing.T) {
 			},
 			prepare: func(t *testLogicalSwitchPort) {
 				t.Type = "somethingElse"
-				t.Tag = []int{6}
+				t.Tag = &six
 			},
 			result: []ovsdb.Operation{
 				{
@@ -857,7 +864,7 @@ func TestAPIUpdate(t *testing.T) {
 			},
 			prepare: func(t *testLogicalSwitchPort) {
 				t.Type = "somethingElse"
-				t.Tag = []int{6}
+				t.Tag = &six
 			},
 			result: []ovsdb.Operation{
 				{
@@ -874,7 +881,7 @@ func TestAPIUpdate(t *testing.T) {
 			condition: func(a API) ConditionalAPI {
 				t := testLogicalSwitchPort{
 					Type:    "sometype",
-					Enabled: []bool{true},
+					Enabled: &trueVal,
 				}
 				return a.Where(&t, model.Condition{
 					Field:    &t.Type,
@@ -883,7 +890,7 @@ func TestAPIUpdate(t *testing.T) {
 				})
 			},
 			prepare: func(t *testLogicalSwitchPort) {
-				t.Tag = []int{6}
+				t.Tag = &six
 			},
 			result: []ovsdb.Operation{
 				{
@@ -908,11 +915,11 @@ func TestAPIUpdate(t *testing.T) {
 					model.Condition{
 						Field:    &t.Enabled,
 						Function: ovsdb.ConditionIncludes,
-						Value:    []bool{true},
+						Value:    &trueVal,
 					})
 			},
 			prepare: func(t *testLogicalSwitchPort) {
-				t.Tag = []int{6}
+				t.Tag = &six
 			},
 			result: []ovsdb.Operation{
 				{
@@ -925,7 +932,7 @@ func TestAPIUpdate(t *testing.T) {
 					Op:    ovsdb.OperationUpdate,
 					Table: "Logical_Switch_Port",
 					Row:   tagRow,
-					Where: []ovsdb.Condition{{Column: "enabled", Function: ovsdb.ConditionIncludes, Value: testOvsSet(t, []bool{true})}},
+					Where: []ovsdb.Condition{{Column: "enabled", Function: ovsdb.ConditionIncludes, Value: testOvsSet(t, &trueVal)}},
 				},
 			},
 			err: false,
@@ -943,11 +950,11 @@ func TestAPIUpdate(t *testing.T) {
 					model.Condition{
 						Field:    &t.Enabled,
 						Function: ovsdb.ConditionIncludes,
-						Value:    []bool{true},
+						Value:    &trueVal,
 					})
 			},
 			prepare: func(t *testLogicalSwitchPort) {
-				t.Tag = []int{6}
+				t.Tag = &six
 			},
 			result: []ovsdb.Operation{
 				{
@@ -956,7 +963,7 @@ func TestAPIUpdate(t *testing.T) {
 					Row:   tagRow,
 					Where: []ovsdb.Condition{
 						{Column: "type", Function: ovsdb.ConditionEqual, Value: "sometype"},
-						{Column: "enabled", Function: ovsdb.ConditionIncludes, Value: testOvsSet(t, []bool{true})},
+						{Column: "enabled", Function: ovsdb.ConditionIncludes, Value: testOvsSet(t, &trueVal)},
 					},
 				},
 			},
@@ -967,7 +974,7 @@ func TestAPIUpdate(t *testing.T) {
 			condition: func(a API) ConditionalAPI {
 				t := testLogicalSwitchPort{
 					Type:    "sometype",
-					Enabled: []bool{true},
+					Enabled: &trueVal,
 				}
 				return a.Where(&t, model.Condition{
 					Field:    &t.Type,
@@ -976,7 +983,7 @@ func TestAPIUpdate(t *testing.T) {
 				})
 			},
 			prepare: func(t *testLogicalSwitchPort) {
-				t.Tag = []int{6}
+				t.Tag = &six
 			},
 			result: []ovsdb.Operation{
 				{
@@ -992,12 +999,12 @@ func TestAPIUpdate(t *testing.T) {
 			name: "select multiple by predicate change multiple field",
 			condition: func(a API) ConditionalAPI {
 				return a.WhereCache(func(t *testLogicalSwitchPort) bool {
-					return t.Enabled != nil && t.Enabled[0] == true
+					return t.Enabled != nil && *t.Enabled == true
 				})
 			},
 			prepare: func(t *testLogicalSwitchPort) {
 				t.Type = "somethingElse"
-				t.Tag = []int{6}
+				t.Tag = &six
 			},
 			result: []ovsdb.Operation{
 				{
@@ -1041,23 +1048,23 @@ func TestAPIDelete(t *testing.T) {
 			Name:        "lsp0",
 			Type:        "someType",
 			ExternalIds: map[string]string{"foo": "bar"},
-			Enabled:     []bool{true},
-			Tag:         []int{1},
+			Enabled:     &trueVal,
+			Tag:         &one,
 		},
 		aUUID1: &testLogicalSwitchPort{
 			UUID:        aUUID1,
 			Name:        "lsp1",
 			Type:        "someType",
 			ExternalIds: map[string]string{"foo": "baz"},
-			Tag:         []int{1},
-			Enabled:     []bool{true},
+			Tag:         &one,
+			Enabled:     &trueVal,
 		},
 		aUUID2: &testLogicalSwitchPort{
 			UUID:        aUUID2,
 			Name:        "lsp2",
 			Type:        "someOtherType",
 			ExternalIds: map[string]string{"foo": "baz"},
-			Tag:         []int{1},
+			Tag:         &one,
 		},
 	}
 	testData := cache.Data{
@@ -1107,7 +1114,7 @@ func TestAPIDelete(t *testing.T) {
 			name: "select by field equality",
 			condition: func(a API) ConditionalAPI {
 				t := testLogicalSwitchPort{
-					Enabled: []bool{true},
+					Enabled: &trueVal,
 				}
 				return a.Where(&t, model.Condition{
 					Field:    &t.Type,
@@ -1128,7 +1135,7 @@ func TestAPIDelete(t *testing.T) {
 			name: "select any by field ",
 			condition: func(a API) ConditionalAPI {
 				t := testLogicalSwitchPort{
-					Enabled: []bool{true},
+					Enabled: &trueVal,
 				}
 				return a.Where(&t,
 					model.Condition{
@@ -1159,7 +1166,7 @@ func TestAPIDelete(t *testing.T) {
 			name: "select all by field ",
 			condition: func(a API) ConditionalAPI {
 				t := testLogicalSwitchPort{
-					Enabled: []bool{true},
+					Enabled: &trueVal,
 				}
 				return a.WhereAll(&t,
 					model.Condition{
@@ -1188,7 +1195,7 @@ func TestAPIDelete(t *testing.T) {
 			name: "select multiple by predicate",
 			condition: func(a API) ConditionalAPI {
 				return a.WhereCache(func(t *testLogicalSwitchPort) bool {
-					return t.Enabled != nil && t.Enabled[0] == true
+					return t.Enabled != nil && *t.Enabled == true
 				})
 			},
 			result: []ovsdb.Operation{
